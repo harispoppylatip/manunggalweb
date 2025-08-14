@@ -572,7 +572,7 @@
         e.preventDefault(); switchTab(btn.dataset.tab);
       });
 
-      document.getElementById('pumpToggle')?.addEventListener('change', function(){ togglePump(this.checked, true); });
+      document.getElementById('pumpToggle')?.addEventListener('change', function(){ togglePump(this.checked, true, 'manual'); });
 
       document.getElementById('setTimeSchedule')?.addEventListener('click', setTimeSchedule);
       document.getElementById('setMoistureControl')?.addEventListener('click', setMoistureControl);
@@ -642,21 +642,31 @@
     function handleMqttMessage(topic, message){
       let data; try{ data = JSON.parse(message.toString()); }catch(e){ return; }
       if (topic === MQTT_TOPICS.relayState){
-        sensorData.pumpStatus = !!data.relay; togglePump(sensorData.pumpStatus, false);
+        sensorData.pumpStatus = !!data.relay; togglePump(sensorData.pumpStatus, false, data.reason || 'other');
       } else if (topic === MQTT_TOPICS.scheduleState){
+        const prevRun = scheduleData.timeSchedule.running;
         scheduleData.timeSchedule = {
           enabled: !!data.enabled, hour: data.hour, minute: data.minute, duration_min: data.duration_min,
           running: !!data.running, run_until: (data.run_until ? Number(data.run_until) : null)
         };
         updateTimeScheduleStatus();
         handleTimeLeft(scheduleData.timeSchedule.running, scheduleData.timeSchedule.run_until);
+        if (prevRun !== scheduleData.timeSchedule.running) {
+          sendPumpLog(scheduleData.timeSchedule.running ? 'ON' : 'OFF', 'schedule');
+        }
       } else if (topic === MQTT_TOPICS.telemetry){
         if (data?.suhu != null){ sensorData.temperature = data.suhu; updateTemperature(data.suhu); addDataPoint('temperature', data.suhu); }
         if (data?.ph   != null){ sensorData.ph         = data.ph;   updatePH(data.ph);          addDataPoint('ph', data.ph); }
         if (data?.kelembapan_tanah != null){
           sensorData.humidity = data.kelembapan_tanah; updateHumidity(data.kelembapan_tanah); addDataPoint('humidity', data.kelembapan_tanah);
         }
-        if (data?.relay !== undefined) { sensorData.pumpStatus = !!data.relay; togglePump(sensorData.pumpStatus, false); }
+        if (data?.relay !== undefined) { sensorData.pumpStatus = !!data.relay; togglePump(sensorData.pumpStatus, false, data.reason || 'other'); }
+        sendSensorData({
+          suhu: data?.suhu,
+          kelembapan_tanah: data?.kelembapan_tanah,
+          ph: data?.ph,
+          relay: data?.relay
+        });
         updateLastUpdateTime(); renderChart();
       }
     }
@@ -751,8 +761,16 @@
       }).catch(()=>{});
     }
 
+    function sendSensorData(data){
+      fetch('senddata.php', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-API-Key':'GROWY_SECRET_123'},
+        body: JSON.stringify(data)
+      }).catch(()=>{});
+    }
+
     // ================== RELAY ==================
-    function togglePump(isOn, shouldPublish=false){
+    function togglePump(isOn, shouldPublish=false, reason='other'){
       const status = document.getElementById('pumpStatus');
       const toggle = document.getElementById('pumpToggle');
       if(toggle) toggle.checked = !!isOn;
@@ -764,7 +782,7 @@
       }
       if(prev !== sensorData.pumpStatus){
         addLog(`Pump ${sensorData.pumpStatus?'ON':'OFF'}`);
-        sendPumpLog(sensorData.pumpStatus?'ON':'OFF', shouldPublish ? 'manual' : 'other');
+        sendPumpLog(sensorData.pumpStatus?'ON':'OFF', reason);
       }
       if (shouldPublish) safePublishRelay(!!isOn);
       updateLastUpdateTime();
