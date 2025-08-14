@@ -590,6 +590,7 @@
       togglePump(sensorData.pumpStatus, false);
       updateLastUpdateTime();
       updateScheduleStatuses();
+      loadPumpLogs();
     }
 
     function switchTab(tabName) {
@@ -718,15 +719,36 @@
     }
 
     // ================== LOGS ==================
-    function addLog(message){
+    function addLog(message, time=null){
       const list = document.getElementById('logList');
       if(!list) return;
-      const time = new Date().toLocaleString();
+      const ts = time || new Date().toLocaleString();
       const item = document.createElement('li');
-      item.textContent = `[${time}] ${message}`;
+      item.textContent = `[${ts}] ${message}`;
       list.prepend(item);
       const max = 100;
       while(list.children.length > max){ list.removeChild(list.lastChild); }
+    }
+
+    function loadPumpLogs(){
+      fetch('get_pump_logs.php?limit=20')
+        .then(r=>r.json())
+        .then(res=>{
+          if(res.ok){
+            res.data.reverse().forEach(log=>{
+              const time = new Date(log.started_at.replace(' ','T')).toLocaleString();
+              addLog(`Pump ${log.action}`, time);
+            });
+          }
+        }).catch(()=>{});
+    }
+
+    function sendPumpLog(action, reason){
+      fetch('log_pump.php', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({action, reason})
+      }).catch(()=>{});
     }
 
     // ================== RELAY ==================
@@ -740,7 +762,10 @@
         status.className = isOn ? 'pump-status on' : 'pump-status off';
         status.innerHTML = `<i class="fas fa-power-off"></i> PUMP ${isOn?'ON':'OFF'}`;
       }
-      if(prev !== sensorData.pumpStatus){ addLog(`Pump ${sensorData.pumpStatus?'ON':'OFF'}`); }
+      if(prev !== sensorData.pumpStatus){
+        addLog(`Pump ${sensorData.pumpStatus?'ON':'OFF'}`);
+        sendPumpLog(sensorData.pumpStatus?'ON':'OFF', shouldPublish ? 'manual' : 'other');
+      }
       if (shouldPublish) safePublishRelay(!!isOn);
       updateLastUpdateTime();
     }
