@@ -1,8 +1,8 @@
 <?php
 // ====== CONFIG ======
 $DB_HOST = "vps2.haris-iot.my.id";
-$DB_USER = "haris";
-$DB_PASS = "moler333";
+$DB_USER = "manunggal";
+$DB_PASS = "jaya333";
 $DB_NAME = "manunggaljaya";
 
 $API_KEY = "GROWY_SECRET_123"; // samakan dengan yang di ESP32
