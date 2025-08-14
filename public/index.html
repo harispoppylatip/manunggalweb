@@ -162,6 +162,11 @@
     .pump-status.on{ color:var(--primary-color); }
     .pump-status.off{ color:var(--text-light); }
 
+    .card.logs .card-icon{ background:linear-gradient(135deg,#6c5ce7,#a29bfe); }
+    .log-list{ list-style:none; max-height:200px; overflow-y:auto; font-size:.85rem; color:var(--text-light); margin-top:8px; }
+    .log-list li{ padding:4px 0; border-bottom:1px solid var(--border-color); }
+    .log-list li:last-child{ border-bottom:none; }
+
     /* Schedule */
     .schedule-container{
       background:var(--card-bg); border:1px solid var(--border-color); border-radius:var(--border-radius);
@@ -368,6 +373,18 @@
           <div class="pump-status off" id="pumpStatus"><i class="fas fa-power-off"></i> PUMP OFF</div>
         </div>
       </div>
+
+      <!-- Event Logs -->
+      <div class="card logs">
+        <div class="card-header">
+          <div class="card-icon"><i class="fas fa-clipboard-list"></i></div>
+          <div>
+            <div class="card-title">Event Logs</div>
+            <div class="card-subtitle">Pump & Schedule</div>
+          </div>
+        </div>
+        <ul id="logList" class="log-list"></ul>
+      </div>
     </div>
 
     <!-- Schedule -->
@@ -490,6 +507,7 @@
     let mqttClient = null;
     let currentTheme = localStorage.getItem('theme') || 'light';
     let sensorData = { temperature: null, humidity: null, ph: null, pumpStatus: false };
+    let eventLogs = [];
     let scheduleData = {
       timeSchedule: { enabled: false, hour: 7, minute: 0, duration_min: 15, running: false, run_until: null },
       moistureControl: { enabled: false, threshold: 30, target: 70 }
@@ -699,16 +717,30 @@
       }
     }
 
+    // ================== LOGS ==================
+    function addLog(message){
+      const list = document.getElementById('logList');
+      if(!list) return;
+      const time = new Date().toLocaleString();
+      const item = document.createElement('li');
+      item.textContent = `[${time}] ${message}`;
+      list.prepend(item);
+      const max = 100;
+      while(list.children.length > max){ list.removeChild(list.lastChild); }
+    }
+
     // ================== RELAY ==================
     function togglePump(isOn, shouldPublish=false){
       const status = document.getElementById('pumpStatus');
       const toggle = document.getElementById('pumpToggle');
       if(toggle) toggle.checked = !!isOn;
+      const prev = sensorData.pumpStatus;
       sensorData.pumpStatus = !!isOn;
       if(status){
         status.className = isOn ? 'pump-status on' : 'pump-status off';
         status.innerHTML = `<i class="fas fa-power-off"></i> PUMP ${isOn?'ON':'OFF'}`;
       }
+      if(prev !== sensorData.pumpStatus){ addLog(`Pump ${sensorData.pumpStatus?'ON':'OFF'}`); }
       if (shouldPublish) safePublishRelay(!!isOn);
       updateLastUpdateTime();
     }
@@ -728,6 +760,7 @@
       const schedulePayload = { enable: true, hour, minute, duration_min: duration };
       scheduleData.timeSchedule = { enabled:true, hour, minute, duration_min: duration, running: false, run_until: null };
       publishMqtt(MQTT_TOPICS.scheduleSet, schedulePayload, false);
+      addLog(`Schedule set for ${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')} ${duration}min`);
       updateTimeScheduleStatus();
       stopTimeLeft();
     }
@@ -736,6 +769,7 @@
       const schedulePayload = { enable: false, hour: 0, minute: 0, duration_min: 0 };
       scheduleData.timeSchedule.enabled = false;
       publishMqtt(MQTT_TOPICS.scheduleSet, schedulePayload, false);
+      addLog('Schedule disabled');
       updateTimeScheduleStatus();
       stopTimeLeft();
     }
@@ -767,6 +801,7 @@
       if ([threshold,target].some(x=>Number.isNaN(x)) || threshold >= target) { alert('Please enter valid threshold values (threshold < target)'); return; }
       scheduleData.moistureControl = { enabled, threshold, target };
       updateMoistureStatus();
+      addLog(`Moisture control ${enabled?'enabled':'disabled'} (${threshold}-${target}%)`);
     }
 
     function updateMoistureStatus(){
