@@ -572,7 +572,7 @@
         e.preventDefault(); switchTab(btn.dataset.tab);
       });
 
-      document.getElementById('pumpToggle')?.addEventListener('change', function(){ togglePump(this.checked, true); });
+      document.getElementById('pumpToggle')?.addEventListener('change', function(){ togglePump(this.checked, true, 'manual'); });
 
       document.getElementById('setTimeSchedule')?.addEventListener('click', setTimeSchedule);
       document.getElementById('setMoistureControl')?.addEventListener('click', setMoistureControl);
@@ -590,6 +590,7 @@
       togglePump(sensorData.pumpStatus, false);
       updateLastUpdateTime();
       updateScheduleStatuses();
+      loadPumpLogs();
     }
 
     function switchTab(tabName) {
@@ -641,7 +642,12 @@
     function handleMqttMessage(topic, message){
       let data; try{ data = JSON.parse(message.toString()); }catch(e){ return; }
       if (topic === MQTT_TOPICS.relayState){
-        sensorData.pumpStatus = !!data.relay; togglePump(sensorData.pumpStatus, false);
+        let reason = scheduleData.timeSchedule.running ? 'schedule' : 'other';
+        if (!scheduleData.timeSchedule.running && scheduleData.moistureControl.enabled){
+          if (!sensorData.pumpStatus && data.relay && sensorData.humidity < scheduleData.moistureControl.threshold) reason='moisture';
+          else if (sensorData.pumpStatus && !data.relay && sensorData.humidity > scheduleData.moistureControl.target) reason='moisture';
+        }
+        togglePump(!!data.relay, false, reason);
       } else if (topic === MQTT_TOPICS.scheduleState){
         scheduleData.timeSchedule = {
           enabled: !!data.enabled, hour: data.hour, minute: data.minute, duration_min: data.duration_min,
@@ -655,7 +661,14 @@
         if (data?.kelembapan_tanah != null){
           sensorData.humidity = data.kelembapan_tanah; updateHumidity(data.kelembapan_tanah); addDataPoint('humidity', data.kelembapan_tanah);
         }
-        if (data?.relay !== undefined) { sensorData.pumpStatus = !!data.relay; togglePump(sensorData.pumpStatus, false); }
+        if (data?.relay !== undefined) {
+          let reason = scheduleData.timeSchedule.running ? 'schedule' : 'other';
+          if (!scheduleData.timeSchedule.running && scheduleData.moistureControl.enabled){
+            if (!sensorData.pumpStatus && data.relay && sensorData.humidity < scheduleData.moistureControl.threshold) reason='moisture';
+            else if (sensorData.pumpStatus && !data.relay && sensorData.humidity > scheduleData.moistureControl.target) reason='moisture';
+          }
+          togglePump(!!data.relay, false, reason);
+        }
         updateLastUpdateTime(); renderChart();
       }
     }
@@ -718,19 +731,40 @@
     }
 
     // ================== LOGS ==================
-    function addLog(message){
+    function addLog(message, time=null){
       const list = document.getElementById('logList');
       if(!list) return;
-      const time = new Date().toLocaleString();
+      const ts = time || new Date().toLocaleString();
       const item = document.createElement('li');
-      item.textContent = `[${time}] ${message}`;
+      item.textContent = `[${ts}] ${message}`;
       list.prepend(item);
       const max = 100;
       while(list.children.length > max){ list.removeChild(list.lastChild); }
     }
 
+    function loadPumpLogs(){
+      fetch('get_pump_logs.php?limit=20')
+        .then(r=>r.json())
+        .then(res=>{
+          if(res.ok){
+            res.data.reverse().forEach(log=>{
+              const time = new Date(log.started_at.replace(' ','T')).toLocaleString();
+              addLog(`Pump ${log.action}`, time);
+            });
+          }
+        }).catch(()=>{});
+    }
+
+    function sendPumpLog(action, reason){
+      fetch('log_pump.php', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({action, reason})
+      }).catch(()=>{});
+    }
+
     // ================== RELAY ==================
-    function togglePump(isOn, shouldPublish=false){
+    function togglePump(isOn, shouldPublish=false, reason=null){
       const status = document.getElementById('pumpStatus');
       const toggle = document.getElementById('pumpToggle');
       if(toggle) toggle.checked = !!isOn;
@@ -740,7 +774,10 @@
         status.className = isOn ? 'pump-status on' : 'pump-status off';
         status.innerHTML = `<i class="fas fa-power-off"></i> PUMP ${isOn?'ON':'OFF'}`;
       }
-      if(prev !== sensorData.pumpStatus){ addLog(`Pump ${sensorData.pumpStatus?'ON':'OFF'}`); }
+      if(prev !== sensorData.pumpStatus){
+        addLog(`Pump ${sensorData.pumpStatus?'ON':'OFF'}`);
+        if(reason) sendPumpLog(sensorData.pumpStatus?'ON':'OFF', reason);
+      }
       if (shouldPublish) safePublishRelay(!!isOn);
       updateLastUpdateTime();
     }
