@@ -6,5 +6,12 @@ services:
     ports:
       - "5500:80"
     volumes:
-      - ./public:/var/www/html:ro
+      - ./public:/var/www/html:ro   # sudah pas
+    environment:
+      - TZ=Asia/Makassar            # jam container
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     restart: unless-stopped
