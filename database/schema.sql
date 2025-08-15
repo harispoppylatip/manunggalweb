@@ -23,3 +23,13 @@ CREATE TABLE pump_logs (
   action VARCHAR(10),
   note VARCHAR(255)
 );
+
+CREATE TABLE moisture_config (
+  id TINYINT PRIMARY KEY,
+  enabled TINYINT NOT NULL,
+  threshold INT NOT NULL,
+  target INT NOT NULL
+);
+
+INSERT INTO moisture_config (id, enabled, threshold, target)
+VALUES (1, 0, 30, 70);
