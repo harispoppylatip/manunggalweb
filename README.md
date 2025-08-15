@@ -5,18 +5,26 @@ Proyek ini menampilkan data sensor dan kontrol pompa melalui web. Aplikasi berja
 ## Menjalankan Aplikasi
 
 1. Pastikan **Docker** dan **Docker Compose** terpasang.
-2. Jalankan layanan web:
+2. Jalankan layanan web dan basis data:
    ```bash
    docker-compose up -d
    ```
+   Perintah di atas akan memulai kontainer web serta kontainer MySQL yang otomatis terisi dengan skema dan data contoh dari folder `database/`.
 3. Buka `http://localhost:5500` di peramban.
 
 ## Konfigurasi Basis Data
 
-Aplikasi memerlukan basis data MySQL/MariaDB. Kredensial dapat diatur melalui variabel lingkungan `DB_HOST`, `DB_USER`, `DB_PASS`, dan `DB_NAME` (nilai bawaan: `localhost`, `manunggal`, `jaya333`, `manunggaljaya`).
+Secara bawaan, `docker-compose` akan menjalankan MySQL dengan kredensial berikut:
+
+- host: `db`
+- database: `manunggaljaya`
+- user: `manunggal`
+- password: `jaya333`
+
+Anda dapat mengubah kredensial tersebut melalui variabel lingkungan `DB_HOST`, `DB_USER`, `DB_PASS`, dan `DB_NAME`.
 
 ### Struktur Tabel
-Jalankan perintah berikut di basis data yang digunakan:
+Jika menjalankan basis data secara manual, buat tabel berikut:
 
 ```sql
 CREATE TABLE sensor_realtime (
@@ -62,15 +70,7 @@ Folder `database/` menyediakan skrip SQL untuk mengisi basis data dengan data du
 - `seed_24h.sql` — contoh data 24 jam (juga memenuhi grafik 6 jam).
 - `seed_7d.sql` — contoh data agregat 7 hari.
 
-Contoh cara menjalankan skrip pada basis data `manunggaljaya`:
-
-```bash
-mysql -u root -p manunggaljaya < database/schema.sql
-mysql -u root -p manunggaljaya < database/seed_24h.sql
-mysql -u root -p manunggaljaya < database/seed_7d.sql
-```
-
-Setelah skrip dijalankan, grafik pada halaman web akan menampilkan data contoh untuk rentang waktu 6 jam, 24 jam, dan 7 hari.
+Pada penggunaan `docker-compose`, berkas-berkas SQL di folder `database/` akan dijalankan secara otomatis saat kontainer MySQL pertama kali dibuat, sehingga contoh data untuk grafik telah tersedia.
 
 ## API Kunci
 

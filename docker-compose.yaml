@@ -1,14 +1,38 @@
 version: "3.8"
 services:
+  db:
+    image: mysql:8.0
+    container_name: manunggal-db
+    restart: unless-stopped
+    environment:
+      - MYSQL_DATABASE=manunggaljaya
+      - MYSQL_USER=manunggal
+      - MYSQL_PASSWORD=jaya333
+      - MYSQL_ROOT_PASSWORD=root
+      - TZ=Asia/Makassar
+    volumes:
+      - ./database:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   web:
     build: .
     container_name: manunggal
+    depends_on:
+      - db
     ports:
       - "5500:80"
     volumes:
       - ./public:/var/www/html:ro   # sudah pas
     environment:
       - TZ=Asia/Makassar            # jam container
+      - DB_HOST=db
+      - DB_USER=manunggal
+      - DB_PASS=jaya333
+      - DB_NAME=manunggaljaya
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/"]
       interval: 30s
