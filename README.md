@@ -52,6 +52,16 @@ CREATE TABLE pump_logs (
   action VARCHAR(10),
   note VARCHAR(255)
 );
+
+CREATE TABLE moisture_config (
+  id TINYINT PRIMARY KEY,
+  enabled TINYINT NOT NULL,
+  threshold INT NOT NULL,
+  target INT NOT NULL
+);
+
+INSERT INTO moisture_config (id, enabled, threshold, target)
+VALUES (1, 0, 30, 70);
 ```
 
 ## Alur Data
@@ -60,6 +70,7 @@ CREATE TABLE pump_logs (
 - `get_realtime.php?hours=6` mengambil data beberapa jam terakhir dari `sensor_realtime`.
 - `get_hourly.php?days=7` mengambil data agregat per jam dari `sensor_hourly`.
 - Halaman `index.html` menampilkan grafik dan akan memuat data 1H, 6H, 24H atau 7D dari basis data sesuai pilihan pengguna.
+- `moisture_config.php` menyediakan penyimpanan konfigurasi otomasi kelembapan sehingga nilai ambang tetap tersimpan meski halaman direfresh.
 
 ### Contoh Basis Data untuk Grafik
 

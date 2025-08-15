@@ -591,6 +591,7 @@
       resetSensorDisplays();
       togglePump(sensorData.pumpStatus, false);
       updateLastUpdateTime();
+      loadMoistureConfig();
       updateScheduleStatuses();
       loadPumpLogs();
     }
@@ -852,6 +853,11 @@
       const threshold = parseInt(document.getElementById('moistureThreshold')?.value);
       const target = parseInt(document.getElementById('moistureTarget')?.value);
       if ([threshold,target].some(x=>Number.isNaN(x)) || threshold >= target) { alert('Please enter valid threshold values (threshold < target)'); return; }
+      fetch('moisture_config.php', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({enabled, threshold, target})
+      }).catch(()=>{});
       scheduleData.moistureControl = { enabled, threshold, target };
       updateMoistureStatus();
       addLog(`Moisture control ${enabled?'enabled':'disabled'} (${threshold}-${target}%)`);
@@ -876,6 +882,21 @@
       } else if(sensorData.pumpStatus && sensorData.humidity > target){
         togglePump(false, true, 'moisture');
       }
+    }
+
+    function loadMoistureConfig(){
+      fetch('moisture_config.php')
+        .then(r=>r.json())
+        .then(res=>{
+          if(res.ok){
+            const {enabled, threshold, target} = res.data;
+            scheduleData.moistureControl = { enabled: !!enabled, threshold, target };
+            const chk=document.getElementById('moistureAutoEnable'); if(chk) chk.checked=!!enabled;
+            const th=document.getElementById('moistureThreshold'); if(th) th.value=threshold;
+            const ta=document.getElementById('moistureTarget'); if(ta) ta.value=target;
+            updateMoistureStatus();
+          }
+        }).catch(()=>{});
     }
 
     // ===== Time Left =====
