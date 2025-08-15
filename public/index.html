@@ -525,6 +525,7 @@
     let historicalData = { timestamps: [], temperature: [], humidity: [], ph: [] };
     let chart = null;
     let maxDataPoints = 60;
+    let currentRange = '1h';
 
     // ==== HIVE MQ CLOUD (WSS TLS) + AUTH ====
     const MQTT_CONFIG = {
@@ -549,6 +550,7 @@
       initializeDashboard();
       initializeMQTT();
       initializeChart();     // chart versi baru
+      updateChartTimeRange('1h');  // load initial chart data
     });
 
     // ================== UI BASICS ==================
@@ -914,7 +916,8 @@
     function getCss(v){ return getComputedStyle(document.documentElement).getPropertyValue(v) || '#666'; }
 
     function addDataPoint(type, value){
-      const t = new Date().toLocaleTimeString();
+      const now = new Date();
+      const t = currentRange==='7d' ? now.toLocaleDateString() : now.toLocaleTimeString();
       const needNew = (historicalData.timestamps.length===0 || historicalData.timestamps.at(-1)!==t);
       if (needNew){
         historicalData.timestamps.push(t);
@@ -943,12 +946,42 @@
       chart.data.datasets[2].data = historicalData.ph;
       chart.update('none');
     }
-    function updateChartTimeRange(range){
+    async function loadChartData(range){
+      let url;
+      if(range==='7d'){
+        url=`get_hourly.php?days=7`;
+      } else if(range==='24h'){
+        url=`get_realtime.php?hours=24`;
+      } else if(range==='6h'){
+        url=`get_realtime.php?hours=6`;
+      } else {
+        url=`get_realtime.php?hours=1`;
+      }
+      try{
+        const res = await fetch(url);
+        const json = await res.json();
+        historicalData = { timestamps: [], temperature: [], humidity: [], ph: [] };
+        json.data.forEach(r=>{
+          const ts = new Date((r.t ?? r.hour_start)*1000);
+          const label = range==='7d' ? ts.toLocaleDateString() : ts.toLocaleTimeString();
+          historicalData.timestamps.push(label);
+          historicalData.temperature.push(r.suhu ?? r.suhu_avg);
+          historicalData.humidity.push(r.kelembapan_tanah ?? r.kelembapan_avg);
+          historicalData.ph.push(r.ph ?? r.ph_avg);
+        });
+        trimPoints();
+        renderChart();
+      } catch(err){
+        console.error('Failed to load chart data', err);
+      }
+    }
+    async function updateChartTimeRange(range){
+      currentRange = range;
       if (range==='1h') maxDataPoints=60;
       else if (range==='6h') maxDataPoints=72;
       else if (range==='24h') maxDataPoints=96;
       else if (range==='7d') maxDataPoints=168;
-      trimPoints(); renderChart();
+      await loadChartData(range);
     }
   </script>
 </body>
