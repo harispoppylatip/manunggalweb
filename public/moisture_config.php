@@ -35,13 +35,15 @@ if ($method === 'GET') {
     echo json_encode(['ok'=>false,'error'=>'threshold must be < target']);
     exit;
   }
-  $stmt = $mysqli->prepare('INSERT INTO moisture_config (id, enabled, threshold, target) VALUES (1,?,?,?) ON DUPLICATE KEY UPDATE enabled=VALUES(enabled), threshold=VALUES(threshold), target=VALUES(target)');
+  $stmt = $mysqli->prepare('INSERT INTO moisture_config (id, enabled, threshold, target)
+    VALUES (1, ?, ?, ?)
+    ON DUPLICATE KEY UPDATE enabled=?, threshold=?, target=?');
   if (!$stmt) {
     http_response_code(500);
-    echo json_encode(['ok'=>false,'error'=>'Prepare failed']);
+    echo json_encode(['ok'=>false,'error'=>'Prepare failed: '.$mysqli->error]);
     exit;
   }
-  $stmt->bind_param('iii', $enabled, $threshold, $target);
+  $stmt->bind_param('iiiiii', $enabled, $threshold, $target, $enabled, $threshold, $target);
   if (!$stmt->execute()) {
     http_response_code(500);
     echo json_encode(['ok'=>false,'error'=>'Execute failed: '.$stmt->error]);
