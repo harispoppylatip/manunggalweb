@@ -13,7 +13,7 @@ Proyek ini menampilkan data sensor dan kontrol pompa melalui web. Aplikasi berja
 
 ## Konfigurasi Basis Data
 
-Aplikasi memerlukan basis data MySQL/MariaDB. Atur kredensial di setiap berkas PHP (`get_realtime.php`, `get_hourly.php`, `senddata.php`, dll.) pada variabel `$DB_HOST`, `$DB_USER`, `$DB_PASS`, dan `$DB_NAME`.
+Aplikasi memerlukan basis data MySQL/MariaDB. Kredensial dapat diatur melalui variabel lingkungan `DB_HOST`, `DB_USER`, `DB_PASS`, dan `DB_NAME` (nilai bawaan: `localhost`, `manunggal`, `jaya333`, `manunggaljaya`).
 
 ### Struktur Tabel
 Jalankan perintah berikut di basis data yang digunakan:
@@ -52,6 +52,25 @@ CREATE TABLE pump_logs (
 - `get_realtime.php?hours=6` mengambil data beberapa jam terakhir dari `sensor_realtime`.
 - `get_hourly.php?days=7` mengambil data agregat per jam dari `sensor_hourly`.
 - Halaman `index.html` menampilkan grafik dan akan memuat data 1H, 6H, 24H atau 7D dari basis data sesuai pilihan pengguna.
+
+### Contoh Basis Data untuk Grafik
+
+Folder `database/` menyediakan skrip SQL untuk mengisi basis data dengan data dummy:
+
+- `schema.sql` — membuat tabel yang diperlukan.
+- `seed_6h.sql` — contoh data 6 jam terakhir.
+- `seed_24h.sql` — contoh data 24 jam (juga memenuhi grafik 6 jam).
+- `seed_7d.sql` — contoh data agregat 7 hari.
+
+Contoh cara menjalankan skrip pada basis data `manunggaljaya`:
+
+```bash
+mysql -u root -p manunggaljaya < database/schema.sql
+mysql -u root -p manunggaljaya < database/seed_24h.sql
+mysql -u root -p manunggaljaya < database/seed_7d.sql
+```
+
+Setelah skrip dijalankan, grafik pada halaman web akan menampilkan data contoh untuk rentang waktu 6 jam, 24 jam, dan 7 hari.
 
 ## API Kunci
 

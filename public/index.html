@@ -663,6 +663,7 @@
           sensorData.humidity = data.kelembapan_tanah; updateHumidity(data.kelembapan_tanah); addDataPoint('humidity', data.kelembapan_tanah);
         }
         if (data?.relay !== undefined) { sensorData.pumpStatus = !!data.relay; togglePump(sensorData.pumpStatus, false, data.reason || 'other'); }
+        checkMoistureAutomation();
         sendSensorData({
           suhu: data?.suhu,
           kelembapan_tanah: data?.kelembapan_tanah,
@@ -864,6 +865,16 @@
       } else {
         el.innerHTML = '<i class="fas fa-tint"></i> Moisture automation disabled';
         el.className='schedule-status inactive';
+      }
+    }
+
+    function checkMoistureAutomation(){
+      if(!scheduleData.moistureControl.enabled || sensorData.humidity==null) return;
+      const {threshold, target} = scheduleData.moistureControl;
+      if(!sensorData.pumpStatus && sensorData.humidity < threshold){
+        togglePump(true, true, 'moisture');
+      } else if(sensorData.pumpStatus && sensorData.humidity > target){
+        togglePump(false, true, 'moisture');
       }
     }
 

@@ -1,5 +1,8 @@
 <?php
-$DB_HOST="vps2.haris-iot.my.id"; $DB_USER="manunggal"; $DB_PASS="jaya333"; $DB_NAME="manunggaljaya";
+$DB_HOST = getenv('DB_HOST') ?: 'localhost';
+$DB_USER = getenv('DB_USER') ?: 'manunggal';
+$DB_PASS = getenv('DB_PASS') ?: 'jaya333';
+$DB_NAME = getenv('DB_NAME') ?: 'manunggaljaya';
 header("Content-Type: application/json");
 
 if($_SERVER['REQUEST_METHOD'] !== 'POST'){
