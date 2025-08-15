@@ -16,7 +16,7 @@ if(!is_array($data)){
 }
 
 $action = strtoupper($data['action'] ?? 'ON');
-if(!in_array($action, ['ON','OFF'])) $action = 'ON';
+if(!in_array($action, ['ON','OFF','SET','DISABLE'])) $action = 'ON';
 $reason = strtolower($data['reason'] ?? 'manual');
 if(!in_array($reason, ['manual','schedule','moisture','other'])) $reason = 'other';
 $duration = isset($data['duration_sec']) ? (int)$data['duration_sec'] : null;

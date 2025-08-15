@@ -747,17 +747,21 @@
           if(res.ok){
             res.data.reverse().forEach(log=>{
               const time = new Date(log.started_at.replace(' ','T')).toLocaleString();
-              addLog(`Pump ${log.action}`, time);
+              const msg = log.note ? log.note : `Pump ${log.action}`;
+              addLog(msg, time);
             });
           }
         }).catch(()=>{});
     }
 
-    function sendPumpLog(action, reason){
+    function sendPumpLog(action, reason, durationSec=null, note=null){
+      const payload = {action, reason};
+      if(durationSec !== null) payload.duration_sec = durationSec;
+      if(note !== null) payload.note = note;
       fetch('log_pump.php', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({action, reason})
+        body: JSON.stringify(payload)
       }).catch(()=>{});
     }
 
@@ -803,7 +807,9 @@
       const schedulePayload = { enable: true, hour, minute, duration_min: duration };
       scheduleData.timeSchedule = { enabled:true, hour, minute, duration_min: duration, running: false, run_until: null };
       publishMqtt(MQTT_TOPICS.scheduleSet, schedulePayload, false);
-      addLog(`Schedule set for ${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')} ${duration}min`);
+      const msg = `Schedule set for ${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')} ${duration}min`;
+      addLog(msg);
+      sendPumpLog('SET', 'schedule', null, msg);
       updateTimeScheduleStatus();
       stopTimeLeft();
     }
@@ -813,6 +819,7 @@
       scheduleData.timeSchedule.enabled = false;
       publishMqtt(MQTT_TOPICS.scheduleSet, schedulePayload, false);
       addLog('Schedule disabled');
+      sendPumpLog('DISABLE', 'schedule', null, 'Schedule disabled');
       updateTimeScheduleStatus();
       stopTimeLeft();
     }
