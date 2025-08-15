@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MQTT Monitor - Debug Tool</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        body { font-family: 'Courier New', monospace; margin: 20px; background: #1e1e1e; color: #f0f0f0; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { color: #00d4aa; text-align: center; }
+        .status { padding: 10px; border-radius: 5px; margin-bottom: 20px; text-align: center; font-weight: bold; }
+        .status.connected { background: #2d5a3d; color: #4ade80; }
+        .status.disconnected { background: #5a2d2d; color: #f87171; }
+        .status.connecting { background: #5a4d2d; color: #fbbf24; }
+        .logs { background: #2a2a2a; border: 1px solid #444; border-radius: 5px; padding: 15px; height: 500px; overflow-y: auto; font-size: 14px; }
+        .log-entry { margin-bottom: 10px; padding: 8px; border-left: 3px solid #00d4aa; background: #333; }
+        .log-time { color: #888; font-size: 12px; }
+        .log-topic { color: #00d4aa; font-weight: bold; }
+        .log-data { color: #f0f0f0; white-space: pre-wrap; margin-top: 5px; }
+        .controls { margin-bottom: 20px; text-align: center; }
+        .btn { background: #00d4aa; color: #1e1e1e; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 0 5px; }
+        .btn:hover { background: #00c4a7; }
+        .clear-btn { background: #dc3545; color: white; }
+        .clear-btn:hover { background: #c82333; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 MQTT Monitor - Debug Tool</h1>
+        
+        <div class="status connecting" id="status">🔄 Connecting to MQTT...</div>
+        
+        <div class="controls">
+            <button class="btn" onclick="reconnect()">🔄 Reconnect</button>
+            <button class="btn clear-btn" onclick="clearLogs()">🗑️ Clear Logs</button>
+            <button class="btn" onclick="exportLogs()">💾 Export Logs</button>
+        </div>
+        
+        <div class="logs" id="logs">
+            <div class="log-entry">
+                <div class="log-time">Waiting for MQTT connection...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let mqttClient = null;
+        let logCount = 0;
+        const maxLogs = 100;
+
+        // MQTT Configuration
+        const MQTT_CONFIG = {
+            host: 'd61b7602f60d488a985eb51f2e8a7e65.s1.eu.hivemq.cloud',
+            port: 8884,
+            path: '/mqtt',
+            protocol: 'wss',
+            clientId: 'mqtt-monitor-' + Math.random().toString(16).slice(2,10)
+        };
+        const MQTT_AUTH = { username: 'manunggal', password: 'Jayaa333' };
+
+        const MQTT_TOPICS = {
+            relaySet: 'growy/relay/set',
+            relayState: 'growy/relay/state',
+            scheduleSet: 'growy/relay/schedule/set',
+            scheduleState: 'growy/relay/schedule/state',
+            telemetry: 'growy/telemetry'
+        };
+
+        function addLog(topic, message, type = 'info') {
+            const logsContainer = document.getElementById('logs');
+            const timestamp = new Date().toLocaleString();
+            
+            let parsedData;
+            try {
+                parsedData = JSON.stringify(JSON.parse(message), null, 2);
+            } catch (e) {
+                parsedData = message;
+            }
+
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            logEntry.innerHTML = `
+                <div class="log-time">[${timestamp}]</div>
+                <div class="log-topic">Topic: ${topic}</div>
+                <div class="log-data">${parsedData}</div>
+            `;
+
+            logsContainer.insertBefore(logEntry, logsContainer.firstChild);
+            
+            // Limit logs
+            logCount++;
+            if (logCount > maxLogs) {
+                const oldEntries = logsContainer.querySelectorAll('.log-entry');
+                if (oldEntries.length > maxLogs) {
+                    oldEntries[oldEntries.length - 1].remove();
+                }
+            }
+        }
+
+        function updateStatus(status, message) {
+            const statusEl = document.getElementById('status');
+            statusEl.className = `status ${status}`;
+            
+            if (status === 'connected') {
+                statusEl.innerHTML = '✅ Connected to MQTT';
+            } else if (status === 'disconnected') {
+                statusEl.innerHTML = '❌ Disconnected from MQTT';
+            } else {
+                statusEl.innerHTML = '🔄 Connecting to MQTT...';
+            }
+        }
+
+        function initializeMQTT() {
+            try {
+                if (mqttClient) {
+                    mqttClient.end(true);
+                }
+            } catch (e) {
+                console.error('Error closing previous connection:', e);
+            }
+
+            const url = `${MQTT_CONFIG.protocol}://${MQTT_CONFIG.host}:${MQTT_CONFIG.port}${MQTT_CONFIG.path}`;
+            addLog('SYSTEM', `Connecting to: ${url}`, 'info');
+            
+            mqttClient = mqtt.connect(url, {
+                clientId: MQTT_CONFIG.clientId,
+                clean: true,
+                connectTimeout: 10000,
+                reconnectPeriod: 2000,
+                keepalive: 30,
+                username: MQTT_AUTH.username,
+                password: MQTT_AUTH.password,
+                protocolVersion: 4
+            });
+
+            mqttClient.on('connect', () => {
+                updateStatus('connected');
+                addLog('SYSTEM', 'Successfully connected to MQTT broker', 'success');
+                
+                // Subscribe to all topics
+                const allTopics = Object.values(MQTT_TOPICS);
+                mqttClient.subscribe(allTopics, (err) => {
+                    if (err) {
+                        addLog('ERROR', `Subscribe error: ${err.message}`, 'error');
+                    } else {
+                        addLog('SYSTEM', `Subscribed to topics: ${allTopics.join(', ')}`, 'info');
+                    }
+                });
+            });
+
+            mqttClient.on('message', (topic, message) => {
+                addLog(topic, message.toString());
+            });
+
+            mqttClient.on('error', (err) => {
+                updateStatus('disconnected');
+                addLog('ERROR', `MQTT Error: ${err.message}`, 'error');
+            });
+
+            mqttClient.on('offline', () => {
+                updateStatus('disconnected');
+                addLog('SYSTEM', 'MQTT client went offline', 'warning');
+            });
+
+            mqttClient.on('close', () => {
+                updateStatus('disconnected');
+                addLog('SYSTEM', 'MQTT connection closed', 'warning');
+            });
+
+            mqttClient.on('reconnect', () => {
+                updateStatus('connecting');
+                addLog('SYSTEM', 'Attempting to reconnect...', 'info');
+            });
+        }
+
+        function reconnect() {
+            addLog('SYSTEM', 'Manual reconnect initiated', 'info');
+            initializeMQTT();
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+            logCount = 0;
+            addLog('SYSTEM', 'Logs cleared', 'info');
+        }
+
+        function exportLogs() {
+            const logs = document.getElementById('logs').innerText;
+            const blob = new Blob([logs], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `mqtt-logs-${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeMQTT();
+        });
+    </script>
+</body>
+</html>

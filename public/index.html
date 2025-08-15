@@ -50,31 +50,46 @@
 
     /* Navbar */
     .navbar{
-      position:fixed; inset:0 0 auto 0; height:var(--navbar-height);
-      background:var(--card-bg); border-bottom:1px solid var(--border-color);
-      box-shadow:var(--shadow); z-index:1000;
+      position:fixed; top:0; left:0; right:0; z-index:1000;
+      background:var(--white); border-bottom:1px solid var(--border-color);
+      height:var(--navbar-height); display:flex; align-items:center; justify-content:space-between;
+      padding:0 20px; backdrop-filter:blur(20px); box-shadow:var(--shadow);
     }
-    .navbar-content{
-      max-width:1200px; margin:0 auto; height:100%;
-      display:flex; align-items:center; justify-content:space-between; padding:0 20px;
+    .navbar-content{ 
+      display:flex; align-items:center; justify-content:space-between; 
+      width:100%; max-width:1200px; margin:0 auto; padding:0 20px; 
     }
     .navbar-left{ display:flex; align-items:center; gap:12px; }
-    .navbar-logo{
-      width:40px; height:40px; background:linear-gradient(135deg,var(--primary-color),#00c4a7);
-      border-radius:10px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:18px;
+    .navbar-logo{ 
+      color:var(--primary-color); font-size:1.5rem; 
+      width:40px; height:40px; display:flex; align-items:center; justify-content:center;
+      background:var(--secondary-color); border-radius:10px;
     }
-    .navbar-title{ font-size:1.4rem; font-weight:700; color:var(--text-dark); }
-    .navbar-subtitle{ font-size:.8rem; color:var(--text-light); margin-left:2px; }
-
+    .navbar-title{ font-size:1.2rem; font-weight:600; color:var(--text-dark); line-height:1.2; }
+    .navbar-subtitle{ font-size:.8rem; color:var(--text-light); }
     .navbar-right{ display:flex; align-items:center; gap:12px; }
-    .connection-info{ display:flex; flex-direction:column; gap:4px; }
-    .connection-status{
-      display:flex; align-items:center; gap:8px; padding:6px 12px; border-radius:16px;
-      font-size:.8rem; font-weight:500;
+    .connection-info{ display:flex; align-items:center; gap:8px; }
+    .status-indicator{ display:flex; align-items:center; gap:8px; }
+    .status-dot{ width:8px; height:8px; border-radius:50%; }
+    .status-dot.connected{ background:#10b981; animation:pulse 2s infinite; }
+    .status-dot.disconnected{ background:#ef4444; }
+    @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.5;} }
+
+    .chart-btn {
+      background: #4e73df;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 16px;
+      font-size: 1rem;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: background 0.2s, transform 0.2s;
     }
-    .connection-status.connected{ background:var(--secondary-color); color:var(--primary-color); }
-    .connection-status.disconnected{ background:rgba(220,53,69,.1); color:#dc3545; }
-    .connection-status.connecting{ background:rgba(255,193,7,.1); color:#ffc107; }
+    .chart-btn:hover {
+      background: #2e59d9;
+      transform: translateY(-2px) scale(1.05);
+    }
     .connection-details{ display:flex; flex-direction:column; gap:2px; font-size:.7rem; color:var(--text-light); }
     .broker-info,.client-info{ font-family:monospace; }
 
@@ -325,7 +340,19 @@
       .modal-body{ padding:12px; }
       .modal-chart-container{ height:250px; }
       .modal-stats{ grid-template-columns:1fr; gap:8px; }
-      .chart-btn{ width:28px; height:28px; font-size:12px; }
+      .chart-btn{ 
+        font-size: 1.25rem;
+        padding: 16px 0;
+        width: 100%;
+        min-height: 48px;
+        border-radius: 10px;
+        margin-top: 14px;
+        box-shadow: 0 2px 8px rgba(78,115,223,0.08);
+        position: static;
+        background: #4e73df;
+        color: #fff;
+        border: 1px solid #4e73df;
+      }
     }
 
     *{ transition:background-color .2s ease, color .2s ease, border-color .2s ease, box-shadow .2s ease; }
@@ -775,10 +802,14 @@
     function disconnected(){ isConnected=false; updateConnectionStatus('disconnected'); resetSensorDisplays(); stopTimeLeft(); }
 
     function handleMqttMessage(topic, message){
-      let data; try{ data = JSON.parse(message.toString()); }catch(e){ return; }
+      console.log('🔔 MQTT Message Received:', { topic, message: message.toString() });
+      let data; try{ data = JSON.parse(message.toString()); console.log('📦 Parsed Data:', data); }catch(e){ console.error('❌ JSON Parse Error:', e); return; }
       if (topic === MQTT_TOPICS.relayState){
+        console.log('🔌 Relay State Update:', data);
         sensorData.pumpStatus = !!data.relay; togglePump(sensorData.pumpStatus, false, data.reason || 'other');
       } else if (topic === MQTT_TOPICS.scheduleState){
+        console.log('⏰ Schedule State Update:', data);
+        console.log('⏰ Schedule State Update:', data);
         const prevRun = scheduleData.timeSchedule.running;
         scheduleData.timeSchedule = {
           enabled: !!data.enabled, hour: data.hour, minute: data.minute, duration_min: data.duration_min,
@@ -790,10 +821,20 @@
           sendPumpLog(scheduleData.timeSchedule.running ? 'ON' : 'OFF', 'schedule');
         }
       } else if (topic === MQTT_TOPICS.telemetry){
+        console.log('📊 Telemetry Data:', data);
         if (data?.suhu != null){ sensorData.temperature = data.suhu; updateTemperature(data.suhu); addDataPoint('temperature', data.suhu); }
         if (data?.ph   != null){ sensorData.ph         = data.ph;   updatePH(data.ph);          addDataPoint('ph', data.ph); }
         if (data?.kelembapan_tanah != null){
-          sensorData.humidity = data.kelembapan_tanah; updateHumidity(data.kelembapan_tanah); addDataPoint('humidity', data.kelembapan_tanah);
+          console.log('💧 Humidity Data Received:', { 
+            raw: data.kelembapan_tanah, 
+            type: typeof data.kelembapan_tanah,
+            isNull: data.kelembapan_tanah === null,
+            isUndefined: data.kelembapan_tanah === undefined,
+            isZero: data.kelembapan_tanah === 0
+          });
+          sensorData.humidity = data.kelembapan_tanah; 
+          updateHumidity(data.kelembapan_tanah); 
+          addDataPoint('humidity', data.kelembapan_tanah);
         }
         if (data?.relay !== undefined) { sensorData.pumpStatus = !!data.relay; togglePump(sensorData.pumpStatus, false, data.reason || 'other'); }
         checkMoistureAutomation();
@@ -1248,12 +1289,19 @@
 
     // ================== MODAL FUNCTIONS ==================
     function openSensorModal(sensorType) {
+      console.log('Opening sensor modal for:', sensorType);
+      
       currentModalSensor = sensorType;
       currentModalRange = '1h';
       
       const modal = document.getElementById('sensorModal');
       const modalTitle = document.getElementById('modalTitle');
       const modalIcon = document.getElementById('modalIcon');
+      
+      if (!modal || !modalTitle || !modalIcon) {
+        console.error('Modal elements not found!');
+        return;
+      }
       
       // Update modal appearance based on sensor type
       const sensorConfig = {
@@ -1293,6 +1341,8 @@
       // Show modal
       modal.classList.add('active');
       document.body.style.overflow = 'hidden';
+      
+      console.log('Modal opened, initializing chart...');
       
       // Initialize modal chart
       setTimeout(() => {
@@ -1428,8 +1478,12 @@
           url=`get_realtime.php?hours=1`;
         }
         
+        console.log('Modal Chart - Loading data from:', url, 'for sensor:', currentModalSensor);
+        
         const res = await fetch(url);
         const json = await res.json();
+        
+        console.log('Modal Chart - API Response:', json);
         
         const modalData = { timestamps: [], values: [] };
         
@@ -1448,6 +1502,8 @@
           }
           modalData.values.push(value);
         });
+        
+        console.log('Modal Chart - Processed data:', modalData);
         
         // Update chart
         modalChart.data.labels = modalData.timestamps;

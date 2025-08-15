@@ -1,29 +1,54 @@
 <?php
-$DB_HOST = getenv('DB_HOST') ?: 'localhost';
-$DB_USER = getenv('DB_USER') ?: 'manunggal';
-$DB_PASS = getenv('DB_PASS') ?: 'jaya333';
-$DB_NAME = getenv('DB_NAME') ?: 'manunggaljaya';
-$API_KEY = "GROWY_SECRET_123";
-header("Content-Type: application/json");
+require_once 'config.php';
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(["ok"=>false,"error"=>"Method not allowed, use POST"]); exit; }
-if (($_SERVER['HTTP_X_API_KEY'] ?? '') !== $API_KEY) { http_response_code(401); echo json_encode(["ok"=>false,"error"=>"Unauthorized"]); exit; }
+// Validate request method and API key
+validateMethod('POST');
+requireApiKey();
 
-$data = json_decode(file_get_contents("php://input"), true);
-if (!is_array($data)) { http_response_code(400); echo json_encode(["ok"=>false,"error"=>"Invalid JSON"]); exit; }
-
-$suhu  = array_key_exists('suhu',$data) ? (is_null($data['suhu'])?null:(float)$data['suhu']) : null;
-$soil  = array_key_exists('kelembapan_tanah',$data) ? (is_null($data['kelembapan_tanah'])?null:(int)$data['kelembapan_tanah']) : null;
-$ph    = array_key_exists('ph',$data) ? (is_null($data['ph'])?null:(float)$data['ph']) : null;
-$relay = array_key_exists('relay',$data) ? (int)$data['relay'] : 0;
-
-$mysqli = @new mysqli($DB_HOST,$DB_USER,$DB_PASS,$DB_NAME);
-if ($mysqli->connect_errno) { http_response_code(500); echo json_encode(["ok"=>false,"error"=>"DB connect: ".$mysqli->connect_error]); exit; }
-
-$stmt = $mysqli->prepare("INSERT INTO sensor_realtime (suhu, kelembapan_tanah, ph, relay) VALUES (?,?,?,?)");
-if (!$stmt) { http_response_code(500); echo json_encode(["ok"=>false,"error"=>"Prepare failed"]); exit; }
-$stmt->bind_param("didi", $suhu, $soil, $ph, $relay);
-$ok = $stmt->execute();
-if (!$ok) { http_response_code(500); echo json_encode(["ok"=>false,"error"=>"Execute failed: ".$stmt->error]); exit; }
-
-echo json_encode(["ok"=>true,"id"=>$stmt->insert_id]);
+try {
+    // Get and validate input data
+    $data = getJsonInput();
+    
+    $suhu = array_key_exists('suhu', $data) ? 
+        (is_null($data['suhu']) ? null : sanitizeInput($data['suhu'], 'float')) : null;
+    
+    $soil = array_key_exists('kelembapan_tanah', $data) ? 
+        (is_null($data['kelembapan_tanah']) ? null : sanitizeInput($data['kelembapan_tanah'], 'int')) : null;
+    
+    $ph = array_key_exists('ph', $data) ? 
+        (is_null($data['ph']) ? null : sanitizeInput($data['ph'], 'float')) : null;
+    
+    $relay = sanitizeInput($data['relay'] ?? 0, 'int');
+    
+    // Log received data for debugging
+    logMessage("Sensor data received: " . json_encode($data));
+    
+    // Get database connection
+    $mysqli = getDbConnection();
+    
+    // Prepare and execute insert statement
+    $stmt = $mysqli->prepare("INSERT INTO sensor_realtime (suhu, kelembapan_tanah, ph, relay) VALUES (?,?,?,?)");
+    if (!$stmt) {
+        throw new Exception("Prepare failed: " . $mysqli->error);
+    }
+    
+    $stmt->bind_param("didi", $suhu, $soil, $ph, $relay);
+    
+    if (!$stmt->execute()) {
+        throw new Exception("Execute failed: " . $stmt->error);
+    }
+    
+    $insertId = $stmt->insert_id;
+    $stmt->close();
+    $mysqli->close();
+    
+    // Log success
+    logMessage("Sensor data saved with ID: $insertId");
+    
+    // Send success response
+    sendSuccess(['id' => $insertId]);
+    
+} catch (Exception $e) {
+    logMessage("Error in senddata.php: " . $e->getMessage(), 'ERROR');
+    sendError($e->getMessage(), 500);
+}
