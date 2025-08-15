@@ -852,15 +852,27 @@
       const enabled = document.getElementById('moistureAutoEnable')?.checked;
       const threshold = parseInt(document.getElementById('moistureThreshold')?.value);
       const target = parseInt(document.getElementById('moistureTarget')?.value);
-      if ([threshold,target].some(x=>Number.isNaN(x)) || threshold >= target) { alert('Please enter valid threshold values (threshold < target)'); return; }
+      if ([threshold,target].some(x=>Number.isNaN(x)) || threshold >= target) {
+        alert('Please enter valid threshold values (threshold < target)');
+        return;
+      }
       fetch('moisture_config.php', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body: JSON.stringify({enabled, threshold, target})
-      }).catch(()=>{});
-      scheduleData.moistureControl = { enabled, threshold, target };
-      updateMoistureStatus();
-      addLog(`Moisture control ${enabled?'enabled':'disabled'} (${threshold}-${target}%)`);
+      })
+        .then(r=>r.json())
+        .then(res=>{
+          if(res.ok){
+            const {enabled:e, threshold:t, target:ta} = res.data;
+            scheduleData.moistureControl = { enabled: !!e, threshold: t, target: ta };
+            updateMoistureStatus();
+            addLog(`Moisture control ${enabled?'enabled':'disabled'} (${threshold}-${target}%)`);
+          } else {
+            alert('Failed to save moisture config');
+          }
+        })
+        .catch(()=>{ alert('Failed to save moisture config'); });
     }
 
     function updateMoistureStatus(){
