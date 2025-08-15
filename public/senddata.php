@@ -1,8 +1,8 @@
 <?php
-$DB_HOST = "vps2.haris-iot.my.id";
-$DB_USER = "manunggal";
-$DB_PASS = "jaya333";   // <-- diperbarui
-$DB_NAME = "manunggaljaya";
+$DB_HOST = getenv('DB_HOST') ?: 'localhost';
+$DB_USER = getenv('DB_USER') ?: 'manunggal';
+$DB_PASS = getenv('DB_PASS') ?: 'jaya333';
+$DB_NAME = getenv('DB_NAME') ?: 'manunggaljaya';
 $API_KEY = "GROWY_SECRET_123";
 header("Content-Type: application/json");
 
