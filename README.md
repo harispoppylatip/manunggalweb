@@ -95,3 +95,22 @@ Untuk mengirim data ke `senddata.php`, sertakan header `X-API-KEY: GROWY_SECRET_
   "relay": 1
 }
 ```
+
+## Testing
+
+Proyek ini dilengkapi dengan test suite otomatis untuk memastikan kualitas kode. Untuk menjalankan test:
+
+```bash
+# Jalankan semua test
+php tests/run_tests.php
+
+# Atau jalankan test individual
+php tests/ConfigTest.php
+php tests/ApiTest.php
+```
+
+Test mencakup:
+- Validasi fungsi helper di `config.php`
+- Test endpoint API (memerlukan server yang berjalan)
+
+Lihat dokumentasi lengkap di [tests/README.md](tests/README.md).
